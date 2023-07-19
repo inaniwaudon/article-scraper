@@ -19,8 +19,10 @@ type element struct {
 	content  string
 	language string
 	src      string
-	list     []string
+	caption  string
+	list     []string	
 	elements []element
+	table    [][]string
 }
 
 func elementsToMd(elements []element) string {
@@ -52,7 +54,7 @@ func elementsToMd(elements []element) string {
 		case "ol":
 			l := []string{}
 			for i, item := range e.list {
-				l = append(l, strconv.Itoa(i + 1) + ". " + item)
+				l = append(l, strconv.Itoa(i+1)+". "+item)
 			}
 			t = strings.Join(l, "\n")
 		case "ul":
@@ -61,15 +63,31 @@ func elementsToMd(elements []element) string {
 				l = append(l, "- "+item)
 			}
 			t = strings.Join(l, "\n")
+		case "table":
+			l := []string{}
+			for i, row := range e.table {
+				l = append(l, "| " + strings.Join(row, " | ") + " |")
+				if i == 0 {
+					d := []string{}
+					for _ = range e.table[0] {
+						d = append(d, "---")
+					}
+					l = append(l, "| " + strings.Join(d, " | ") + " |")
+				}
+			}
+			t = strings.Join(l, "\n")
 		case "img":
 			t = "![" + e.content + "](" + e.src + ")"
+			if e.caption != "" {
+				t += "\n*" + e.caption + "*"
+			}
 		case "details":
 			t = ":::details " + e.content + "\n" + elementsToMd(e.elements) + "\n:::"
 			break
 		case "footnote":
 			l := []string{}
 			for i, item := range e.list {
-				l = append(l, "[^" + strconv.Itoa(i + 1) + "]: " + item)
+				l = append(l, "[^"+strconv.Itoa(i+1)+"]: "+item)
 			}
 			t = strings.Join(l, "\n")
 		default:
@@ -86,7 +104,7 @@ func main() {
 	}
 	t := os.Args[1]
 	id := os.Args[2]
-	
+
 	if t == "zenn" {
 		article := scrapeZenn(id)
 		mdtext := elementsToMd(article.body)

@@ -14,12 +14,12 @@ func analyzeInline(s *goquery.Selection) string {
 	s.Contents().Each(func(_ int, cs *goquery.Selection) {
 		n := goquery.NodeName(cs)
 		if n == "#text" {
-			text += cs.Text()
+			text += strings.Trim(cs.Text(), "\n")
 		} else {
 			c := analyzeInline(cs)
 			if n == "a" {
-			h := cs.AttrOr("href", "")
-			text += "[" + c + "](" + h + ")"
+				h := cs.AttrOr("href", "")
+				text += "[" + c + "](" + h + ")"
 			} else if n == "strong" {
 				c := analyzeInline(cs)
 				text += "**" + c + "**"
@@ -27,9 +27,9 @@ func analyzeInline(s *goquery.Selection) string {
 				text += "`" + c + "`"
 			} else if n == "s" {
 				text += "~~" + c + "~~"
-			}else if cs.AttrOr("class", "") == "footnote-ref" {
+			} else if cs.AttrOr("class", "") == "footnote-ref" {
 				t := cs.Text()
-				text += "[^" + t[1:len(t) - 1] + "]"
+				text += "[^" + t[1:len(t)-1] + "]"
 			}
 		}
 	})
@@ -58,6 +58,17 @@ func analyzeBlock(s *goquery.Selection) *element {
 			l = append(l, analyzeInline(cs))
 		})
 		return &element{ttype: name, list: l}
+	} else if name == "table" {
+		// table
+		t := [][]string{}
+		s.Find("tr").Each(func(_ int, cs *goquery.Selection) {
+			row := []string{}
+			cs.Find("th, td").Each(func(_ int, ds *goquery.Selection) {
+				row = append(row, analyzeInline(ds))
+			})
+			t = append(t, row)
+		})
+		return &element{ttype: "table", table: t}
 	} else if class == "footnotes" {
 		// footnote
 		l := []string{}
@@ -66,21 +77,23 @@ func analyzeBlock(s *goquery.Selection) *element {
 		})
 		return &element{ttype: "footnote", list: l}
 	} else if name == "details" {
+		// accordion
+		c := strings.TrimSpace(s.Find("summary").Text())
 		l := []element{}
 		s.Find(".details-content").Contents().Each(func(_ int, cs *goquery.Selection) {
 			l = append(l, *analyzeBlock(cs))
 		})
-		return &element{ttype: "details", content: s.Find("summary").Text(), elements: l}
+		return &element{ttype: "details", content: c, elements: l}
 	} else {
-		// TODO: 伸縮するリスト
 		// others
-		if (name == "p") {
+		if name == "p" {
 			children := s.Children()
-			if (children.Length() == 1 && goquery.NodeName(children.First()) == "img") {
+			if goquery.NodeName(children.First()) == "img" {
 				// img
 				c := children.First().AttrOr("alt", "")
 				src := children.First().AttrOr("src", "")
-				return &element{ttype: "img", content: c, src: src}
+				caption := strings.TrimSpace(s.Find("em").Text())
+				return &element{ttype: "img", content: c, src: src, caption: caption}
 			} else {
 				// paragraph
 				return &element{ttype: "p", content: analyzeInline(s)}
