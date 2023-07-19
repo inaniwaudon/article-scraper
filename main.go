@@ -20,7 +20,7 @@ type element struct {
 	language string
 	src      string
 	caption  string
-	list     []string	
+	list     []string
 	elements []element
 	table    [][]string
 }
@@ -66,13 +66,13 @@ func elementsToMd(elements []element) string {
 		case "table":
 			l := []string{}
 			for i, row := range e.table {
-				l = append(l, "| " + strings.Join(row, " | ") + " |")
+				l = append(l, "| "+strings.Join(row, " | ")+" |")
 				if i == 0 {
 					d := []string{}
 					for _ = range e.table[0] {
 						d = append(d, "---")
 					}
-					l = append(l, "| " + strings.Join(d, " | ") + " |")
+					l = append(l, "| "+strings.Join(d, " | ")+" |")
 				}
 			}
 			t = strings.Join(l, "\n")

@@ -9,29 +9,33 @@ import (
 )
 
 func analyzeInline(s *goquery.Selection) string {
-	text := ""
-
-	s.Contents().Each(func(_ int, cs *goquery.Selection) {
-		n := goquery.NodeName(cs)
-		if n == "#text" {
-			text += strings.Trim(cs.Text(), "\n")
-		} else {
-			c := analyzeInline(cs)
-			if n == "a" {
-				h := cs.AttrOr("href", "")
-				text += "[" + c + "](" + h + ")"
-			} else if n == "strong" {
-				c := analyzeInline(cs)
-				text += "**" + c + "**"
-			} else if n == "code" {
-				text += "`" + c + "`"
-			} else if n == "s" {
-				text += "~~" + c + "~~"
-			} else if cs.AttrOr("class", "") == "footnote-ref" {
-				t := cs.Text()
-				text += "[^" + t[1:len(t)-1] + "]"
-			}
+	n := goquery.NodeName(s)
+	if n == "#text" {
+		return strings.Trim(s.Text(), "\n")
+	} else {
+		c := analyzeLoopInline(s)
+		if n == "a" {
+			h := s.AttrOr("href", "")
+			return "[" + c + "](" + h + ")"
+		} else if n == "strong" {
+			c := analyzeLoopInline(s)
+			return "**" + c + "**"
+		} else if n == "code" {
+			return "`" + c + "`"
+		} else if n == "s" {
+			return "~~" + c + "~~"
+		} else if s.AttrOr("class", "") == "footnote-ref" {
+			t := s.Text()
+			return "[^" + t[1:len(t)-1] + "]"
 		}
+	}
+	return ""
+}
+
+func analyzeLoopInline(s *goquery.Selection) string {
+	text := ""
+	s.Contents().Each(func(_ int, cs *goquery.Selection) {
+		text += analyzeInline(cs)
 	})
 	return text
 }
@@ -55,7 +59,7 @@ func analyzeBlock(s *goquery.Selection) *element {
 		// list
 		l := []string{}
 		s.Find("li").Each(func(_ int, cs *goquery.Selection) {
-			l = append(l, analyzeInline(cs))
+			l = append(l, analyzeLoopInline(cs))
 		})
 		return &element{ttype: name, list: l}
 	} else if name == "table" {
@@ -64,7 +68,7 @@ func analyzeBlock(s *goquery.Selection) *element {
 		s.Find("tr").Each(func(_ int, cs *goquery.Selection) {
 			row := []string{}
 			cs.Find("th, td").Each(func(_ int, ds *goquery.Selection) {
-				row = append(row, analyzeInline(ds))
+				row = append(row, analyzeLoopInline(ds))
 			})
 			t = append(t, row)
 		})
@@ -73,7 +77,13 @@ func analyzeBlock(s *goquery.Selection) *element {
 		// footnote
 		l := []string{}
 		s.Find("li p").Each(func(_ int, cs *goquery.Selection) {
-			l = append(l, strings.TrimSpace(cs.Contents().First().Text()))
+			t := ""
+			cs.Contents().Each(func(i int, ds *goquery.Selection) {
+				if ds.AttrOr("class", "") != "footnote-backref" {
+					t += analyzeInline(ds)
+				}
+			})
+			l = append(l, t)
 		})
 		return &element{ttype: "footnote", list: l}
 	} else if name == "details" {
@@ -96,7 +106,7 @@ func analyzeBlock(s *goquery.Selection) *element {
 				return &element{ttype: "img", content: c, src: src, caption: caption}
 			} else {
 				// paragraph
-				return &element{ttype: "p", content: analyzeInline(s)}
+				return &element{ttype: "p", content: analyzeLoopInline(s)}
 			}
 		} else {
 			return &element{ttype: name, content: strings.TrimSpace(s.Text())}
