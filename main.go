@@ -2,22 +2,25 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strconv"
 	"strings"
 )
-
-type element struct {
-	ttype    string
-	content  string
-	language string
-	name     string
-	list     []string
-}
 
 type article struct {
 	title string
 	tags  []string
 	body  []element
+}
+
+type element struct {
+	ttype    string
+	content  string
+	language string
+	src      string
+	list     []string
+	elements []element
 }
 
 func elementsToMd(elements []element) string {
@@ -41,21 +44,32 @@ func elementsToMd(elements []element) string {
 			t = "```"
 			if e.language != "" {
 				t += e.language
-				if e.name != "" {
-					t += ":" + e.name
+				if e.src != "" {
+					t += ":" + e.src
 				}
 			}
 			t += "\n" + e.content + "\n```"
 		case "ol":
 			l := []string{}
 			for i, item := range e.list {
-				l = append(l, strconv.Itoa(i+1)+". "+item)
+				l = append(l, strconv.Itoa(i + 1) + ". " + item)
 			}
 			t = strings.Join(l, "\n")
-		case "ui":
+		case "ul":
 			l := []string{}
 			for _, item := range e.list {
 				l = append(l, "- "+item)
+			}
+			t = strings.Join(l, "\n")
+		case "img":
+			t = "![" + e.content + "](" + e.src + ")"
+		case "details":
+			t = ":::details " + e.content + "\n" + elementsToMd(e.elements) + "\n:::"
+			break
+		case "footnote":
+			l := []string{}
+			for i, item := range e.list {
+				l = append(l, "[^" + strconv.Itoa(i + 1) + "]: " + item)
 			}
 			t = strings.Join(l, "\n")
 		default:
@@ -67,7 +81,15 @@ func elementsToMd(elements []element) string {
 }
 
 func main() {
-	article := scrapeZenn("7fa50a744cb67a")
-	mdtext := elementsToMd(article.body)
-	fmt.Println(mdtext)
+	if len(os.Args) < 3 {
+		log.Fatal("Not enough arguments.")
+	}
+	t := os.Args[1]
+	id := os.Args[2]
+	
+	if t == "zenn" {
+		article := scrapeZenn(id)
+		mdtext := elementsToMd(article.body)
+		fmt.Println(mdtext)
+	}
 }
